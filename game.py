@@ -467,12 +467,26 @@ class JogoTrucoVisual:
         texto_rodada = self.font.render(f"Rodada {self.rodada_atual}/3", True, BRANCO)
         self.screen.blit(texto_rodada, (self.width // 2 - texto_rodada.get_width() // 2, 60))
 
+    def carta_e_alta(self, carta):
+        """Verifica se a carta é alta (A, 2, 3 ou manilha)."""
+        e_manilha = (carta.valor == self.manilha_valor)
+        idx_base = ORDEM_BASE.index(carta.valor)
+        idx_as = ORDEM_BASE.index('A')
+        return e_manilha or idx_base >= idx_as
+
     def draw_mao_bot(self, jogador_id, x, y):
         quantidade = len(self.maos[jogador_id])
         for i in range(quantidade):
             rect = pygame.Rect(x - quantidade * 15 + i * 30, y, 60, 90)
-            pygame.draw.rect(self.screen, (50, 50, 150), rect, border_radius=6)
-            pygame.draw.rect(self.screen, BRANCO, rect, 2, border_radius=6)
+            
+            # Se for o parceiro (jogador 2) e tiver carta alta, mostra a carta
+            if jogador_id == 2 and i < len(self.maos[2]) and self.carta_e_alta(self.maos[2][i]):
+                carta_vis = CartaVisual(self.maos[2][i], rect.x, rect.y, 60, 90)
+                carta_vis.draw(self.screen, face_up=True)
+            else:
+                # Carta oculta
+                pygame.draw.rect(self.screen, (50, 50, 150), rect, border_radius=6)
+                pygame.draw.rect(self.screen, BRANCO, rect, 2, border_radius=6)
 
     def draw_mensagem(self):
         texto = self.font_grande.render(self.mensagem, True, AMARELO)
