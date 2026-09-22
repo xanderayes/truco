@@ -69,12 +69,8 @@ class CartaVisual:
             valor_text = font.render(self.carta.valor, True, naipe_color)
             surface.blit(valor_text, (self.x + 8, self.y + 8))
             
-            # Desenha o naipe (símbolo simplificado)
-            simbolo = self.get_simbolo_naipe(self.carta.naipe)
-            naipe_font = pygame.font.Font(None, 48)
-            naipe_text = naipe_font.render(simbolo, True, naipe_color)
-            surface.blit(naipe_text, (self.x + self.width//2 - naipe_text.get_width()//2, 
-                                     self.y + self.height//2 - naipe_text.get_height()//2))
+            # Desenha o naipe geometricamente
+            self.draw_naipe(surface, self.carta.naipe, naipe_color)
             
             # Valor invertido no canto inferior direito
             valor_text_rot = pygame.transform.rotate(valor_text, 180)
@@ -98,6 +94,58 @@ class CartaVisual:
             'Paus': '♣'
         }
         return simbolos.get(naipe, '?')
+    
+    def draw_naipe(self, surface, naipe, color):
+        center_x = self.x + self.width // 2
+        center_y = self.y + self.height // 2
+        size = 20
+        
+        if naipe == 'Ouros':
+            # Desenha losango (ouros)
+            points = [
+                (center_x, center_y - size),
+                (center_x + size, center_y),
+                (center_x, center_y + size),
+                (center_x - size, center_y)
+            ]
+            pygame.draw.polygon(surface, color, points)
+            pygame.draw.polygon(surface, color, points, 2)
+            
+        elif naipe == 'Espadas':
+            # Desenha espada
+            # Ponta
+            pygame.draw.polygon(surface, color, [
+                (center_x, center_y - size),
+                (center_x - size//2, center_y),
+                (center_x + size//2, center_y)
+            ])
+            # Haste
+            pygame.draw.line(surface, color, (center_x, center_y), (center_x, center_y + size), 3)
+            # Base
+            pygame.draw.line(surface, color, (center_x - size//2, center_y + size), 
+                            (center_x + size//2, center_y + size), 3)
+            pygame.draw.line(surface, color, (center_x, center_y + size), 
+                            (center_x, center_y + size - 5), 3)
+            
+        elif naipe == 'Copas':
+            # Desenha coração
+            pygame.draw.circle(surface, color, (center_x - size//2, center_y - size//3), size//2)
+            pygame.draw.circle(surface, color, (center_x + size//2, center_y - size//3), size//2)
+            pygame.draw.polygon(surface, color, [
+                (center_x - size, center_y - size//6),
+                (center_x + size, center_y - size//6),
+                (center_x, center_y + size)
+            ])
+            
+        elif naipe == 'Paus':
+            # Desenha trevo (paus)
+            # Três círculos
+            pygame.draw.circle(surface, color, (center_x, center_y - size//2), size//2)
+            pygame.draw.circle(surface, color, (center_x - size//2, center_y + size//4), size//2)
+            pygame.draw.circle(surface, color, (center_x + size//2, center_y + size//4), size//2)
+            # Haste
+            pygame.draw.line(surface, color, (center_x, center_y + size//4), 
+                            (center_x, center_y + size), 3)
 
     def check_hover(self, mouse_pos):
         self.hovered = self.rect.collidepoint(mouse_pos)
