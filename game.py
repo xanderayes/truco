@@ -758,7 +758,7 @@ class JogoTrucoVisual:
         
         # Desenha mãos dos bots (cartas ocultas)
         self.draw_mao_bot(1, self.width - 120, self.height // 2)
-        self.draw_mao_bot(2, self.width // 2, 50)
+        self.draw_mao_bot(2, self.width // 2, 150)
         self.draw_mao_bot(3, 80, self.height // 2)
         
         # Desenha mão do jogador
@@ -836,27 +836,22 @@ class JogoTrucoVisual:
         texto_valor = self.font.render(f"Rodada vale: {self.valor_rodada} ponto(s)", True, AMARELO)
         self.screen.blit(texto_valor, (self.width // 2 - texto_valor.get_width() // 2, 20))
         
-        # Indicador de mão de onze
+        # Indicador de mão de onze - movido para o lado esquerdo
         if self.mao_de_onze:
             texto_onze = self.font.render("MÃO DE ONZE", True, VERMELHO)
-            self.screen.blit(texto_onze, (self.width // 2 - texto_onze.get_width() // 2, 50))
+            self.screen.blit(texto_onze, (20, 60))
             if self.mao_escuro:
                 texto_escuro = self.font.render("NO ESCURO!", True, VERMELHO)
-                self.screen.blit(texto_escuro, (self.width // 2 - texto_escuro.get_width() // 2, 80))
-                texto_instrucao = self.font.render("Pressione 1, 2, 3 para jogar", True, BRANCO)
-                self.screen.blit(texto_instrucao, (self.width // 2 - texto_instrucao.get_width() // 2, 105))
+                self.screen.blit(texto_escuro, (20, 90))
+                texto_instrucao = self.font.render("Pressione 1, 2, 3", True, BRANCO)
+                self.screen.blit(texto_instrucao, (20, 120))
         
         # Vitórias na queda atual
         texto_vitorias = self.font.render(
             f"Rodadas: Nós {self.vitorias_queda[0]} x {self.vitorias_queda[1]} Eles", 
             True, AMARELO
         )
-        if self.mao_escuro:
-            self.screen.blit(texto_vitorias, (self.width // 2 - texto_vitorias.get_width() // 2, 130))
-        elif self.mao_de_onze:
-            self.screen.blit(texto_vitorias, (self.width // 2 - texto_vitorias.get_width() // 2, 80))
-        else:
-            self.screen.blit(texto_vitorias, (self.width // 2 - texto_vitorias.get_width() // 2, 50))
+        self.screen.blit(texto_vitorias, (self.width // 2 - texto_vitorias.get_width() // 2, 50))
 
     def draw_info_mao(self):
         # Vira e manilha
@@ -869,7 +864,7 @@ class JogoTrucoVisual:
         
         # Rodada atual
         texto_rodada = self.font.render(f"Rodada {self.rodada_atual}/3", True, BRANCO)
-        self.screen.blit(texto_rodada, (self.width // 2 - texto_rodada.get_width() // 2, 60))
+        self.screen.blit(texto_rodada, (self.width // 2 - texto_rodada.get_width() // 2, 80))
 
     def carta_e_alta(self, carta):
         """Verifica se a carta é alta (A, 2, 3 ou manilha)."""
