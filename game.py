@@ -177,6 +177,12 @@ class JogoTrucoVisual:
         self.primeira_cangada = False
         self.vencedor_primeira = None
         
+        # Estado do truco
+        self.valor_rodada = 1  # 1, 3, 6, 9, 12
+        self.quem_pediu_truco = None  # jogador que pediu truco
+        self.esperando_resposta_truco = False  # se está esperando aceitar/fugir
+        self.pode_pedir_truco = True  # se ainda pode pedir truco nesta queda
+        
         # Cartas visuais
         self.cartas_visuais = []
         self.cartas_mesa = []
@@ -187,6 +193,12 @@ class JogoTrucoVisual:
         
         # Timer para bots
         self.bot_timer = 0
+        
+        # Botões de truco
+        self.btn_pedir_truco = pygame.Rect(self.width - 200, self.height - 100, 180, 50)
+        self.btn_aumentar_truco = pygame.Rect(self.width - 200, self.height - 160, 180, 50)
+        self.btn_aceitar = pygame.Rect(self.width // 2 - 100, self.height // 2 + 50, 90, 50)
+        self.btn_fugir = pygame.Rect(self.width // 2 + 10, self.height // 2 + 50, 90, 50)
         
         # Inicia nova mão
         self.nova_mao()
@@ -203,6 +215,12 @@ class JogoTrucoVisual:
         self.primeira_cangada = False
         self.vencedor_primeira = None
         self.cartas_mesa = []
+        
+        # Reseta estado do truco
+        self.valor_rodada = 1
+        self.quem_pediu_truco = None
+        self.esperando_resposta_truco = False
+        self.pode_pedir_truco = True
         
         # Cria cartas visuais para o jogador
         self.criar_cartas_jogador()
@@ -246,8 +264,31 @@ class JogoTrucoVisual:
                 carta_vis.check_hover(mouse_pos)
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.jogador_atual == 0:
-                mouse_pos = pygame.mouse.get_pos()
+            mouse_pos = pygame.mouse.get_pos()
+            
+            # Se está esperando resposta de truco
+            if self.esperando_resposta_truco and self.jogador_atual == 0:
+                if self.btn_aceitar.collidepoint(mouse_pos):
+                    self.responder_truco(aceitar=True)
+                elif self.btn_fugir.collidepoint(mouse_pos):
+                    self.responder_truco(aceitar=False)
+                return
+            
+            # Se é a vez do jogador humano e não está esperando truco
+            if self.jogador_atual == 0 and not self.esperando_resposta_truco:
+                # Verifica clique no botão de pedir truco
+                if self.pode_pedir_truco and self.valor_rodada == 1 and self.btn_pedir_truco.collidepoint(mouse_pos):
+                    self.pedir_truco(0)
+                    return
+                # Verifica clique no botão de aumentar truco
+                if self.pode_pedir_truco and self.valor_rodada >= 3 and self.valor_rodada < 12:
+                    # Verifica se pode aumentar (equipe oposta)
+                    if self.quem_pediu_truco is not None and (0 % 2 != self.quem_pediu_truco % 2):
+                        if self.btn_aumentar_truco.collidepoint(mouse_pos):
+                            self.aumentar_truco(0)
+                            return
+                
+                # Verifica clique nas cartas
                 for i, carta_vis in enumerate(self.cartas_visuais):
                     if carta_vis.check_hover(mouse_pos):
                         self.jogar_carta_humano(i)
@@ -282,6 +323,86 @@ class JogoTrucoVisual:
         # Se voltou ao primeiro jogador, processa a rodada
         if self.jogador_atual == self.primeiro_a_jogar:
             self.processar_rodada()
+
+    def pedir_truco(self, jogador_id):
+        """Jogador pede truco."""
+        if not self.pode_pedir_truco:
+            return
+        
+        proximo_jogador = (jogador_id + 1) % 4
+        self.quem_pediu_truco = jogador_id
+        self.esperando_resposta_truco = True
+        self.jogador_atual = proximo_jogador
+        
+        self.mensagem = f"Jogador {jogador_id} pediu TRUCO!"
+        self.mensagem_timer = 180
+
+    def responder_truco(self, aceitar):
+        """Responde ao truco (aceita ou foge)."""
+        if not self.esperando_resposta_truco:
+            return
+        
+        self.esperando_resposta_truco = False
+        
+        if not aceitar:
+            # Fugiu - equipe que pediu ganha os pontos atuais
+            dupla_vencedora = self.quem_pediu_truco % 2
+            if dupla_vencedora == 0:
+                self.placar_nos += self.valor_rodada
+                self.mensagem = f"Eles fugiram! NÓS ganhamos {self.valor_rodada} ponto(s)!"
+            else:
+                self.placar_eles += self.valor_rodada
+                self.mensagem = f"Fugimos! ELES ganham {self.valor_rodada} ponto(s)!"
+            self.mensagem_timer = 120
+            
+            # Verifica fim do jogo
+            if self.placar_nos >= 12 or self.placar_eles >= 12:
+                self.estado = 'fim_jogo'
+            else:
+                self.nova_mao()
+        else:
+            # Aceitou - aumenta o valor da rodada
+            if self.valor_rodada == 1:
+                self.valor_rodada = 3
+                self.mensagem = "TRUCO ACEITO! Rodada vale 3 pontos!"
+            elif self.valor_rodada == 3:
+                self.valor_rodada = 6
+                self.mensagem = "SEIS ACEITO! Rodada vale 6 pontos!"
+            elif self.valor_rodada == 6:
+                self.valor_rodada = 9
+                self.mensagem = "NOVE ACEITO! Rodada vale 9 pontos!"
+            elif self.valor_rodada == 9:
+                self.valor_rodada = 12
+                self.mensagem = "DOZE ACEITO! Rodada vale 12 pontos!"
+            self.mensagem_timer = 120
+            
+            # Quem pediu truco não pode pedir novamente na mesma queda
+            self.pode_pedir_truco = True
+            
+            # O jogo continua normalmente
+            self.jogador_atual = self.quem_pediu_truco
+
+    def aumentar_truco(self, jogador_id):
+        """Aumenta o valor do truco (seis, nove, doze)."""
+        if self.valor_rodada >= 12:
+            return
+        
+        # Apenas a equipe oposta a quem pediu pode aumentar
+        if self.quem_pediu_truco is not None and (jogador_id % 2 == self.quem_pediu_truco % 2):
+            return
+        
+        proximo_jogador = (jogador_id + 1) % 4
+        self.quem_pediu_truco = jogador_id
+        self.esperando_resposta_truco = True
+        self.jogador_atual = proximo_jogador
+        
+        if self.valor_rodada == 3:
+            self.mensagem = f"Jogador {jogador_id} pediu SEIS!"
+        elif self.valor_rodada == 6:
+            self.mensagem = f"Jogador {jogador_id} pediu NOVE!"
+        elif self.valor_rodada == 9:
+            self.mensagem = f"Jogador {jogador_id} pediu DOZE!"
+        self.mensagem_timer = 180
 
     def processar_rodada(self):
         # Determina vencedor da vaza
@@ -330,13 +451,13 @@ class JogoTrucoVisual:
         
         # Verifica fim da queda
         if self.vitorias_queda[0] == 2:
-            self.placar_nos += 1
-            self.mensagem = "NÓS ganhamos a mão!"
+            self.placar_nos += self.valor_rodada
+            self.mensagem = f"NÓS ganhamos a mão! (+{self.valor_rodada})"
             self.mensagem_timer = 120
             self.nova_mao()
         elif self.vitorias_queda[1] == 2:
-            self.placar_eles += 1
-            self.mensagem = "ELES ganharam a mão!"
+            self.placar_eles += self.valor_rodada
+            self.mensagem = f"ELES ganharam a mão! (+{self.valor_rodada})"
             self.mensagem_timer = 120
             self.nova_mao()
         elif self.rodada_atual > 3:
@@ -348,11 +469,11 @@ class JogoTrucoVisual:
 
     def finalizar_queda(self):
         if self.vitorias_queda[0] == 2:
-            self.placar_nos += 1
-            self.mensagem = "NÓS ganhamos a mão!"
+            self.placar_nos += self.valor_rodada
+            self.mensagem = f"NÓS ganhamos a mão! (+{self.valor_rodada})"
         else:
-            self.placar_eles += 1
-            self.mensagem = "ELES ganharam a mão!"
+            self.placar_eles += self.valor_rodada
+            self.mensagem = f"ELES ganharam a mão! (+{self.valor_rodada})"
         
         self.mensagem_timer = 120
         
@@ -399,16 +520,62 @@ class JogoTrucoVisual:
         
         self.proximo_jogador()
 
+    def bot_deve_pedir_truco(self, jogador_id):
+        """Decide se o bot deve pedir truco baseado na força da mão."""
+        cartas = self.maos[jogador_id]
+        forcas = [self.forca_carta(c, self.manilha_valor) for c in cartas]
+        
+        # Se tem pelo menos uma manilha ou carta muito forte
+        tem_manilha = any(f >= 100 for f in forcas)
+        tem_carta_forte = any(f >= 7 for f in forcas)  # A, 2, 3
+        
+        # Pede truco se tem boas cartas e ainda não pediu nesta queda
+        if (tem_manilha or tem_carta_forte) and self.pode_pedir_truco:
+            # Não pede se já pediu antes
+            if self.quem_pediu_truco is not None and (jogador_id % 2 == self.quem_pediu_truco % 2):
+                return False
+            return True
+        return False
+
+    def bot_decidir_truco(self, jogador_id):
+        """Decide se o bot aceita ou foge do truco."""
+        cartas = self.maos[jogador_id]
+        forcas = [self.forca_carta(c, self.manilha_valor) for c in cartas]
+        
+        # Se o valor já está alto, só aceita com cartas muito boas
+        if self.valor_rodada >= 6:
+            tem_manilha = any(f >= 100 for f in forcas)
+            return tem_manilha
+        
+        # Para truco normal (3 pontos), aceita se tem cartas razoáveis
+        tem_carta_boa = any(f >= 5 for f in forcas)  # K, A, 2, 3 ou manilha
+        return tem_carta_boa
+
     def update(self):
         if self.mensagem_timer > 0:
             self.mensagem_timer -= 1
         
-        # Bots jogam automaticamente com delay
-        if self.jogador_atual != 0 and self.estado == 'jogando':
+        # Se está esperando resposta de truco de um bot
+        if self.esperando_resposta_truco and self.jogador_atual != 0 and self.estado == 'jogando':
+            self.bot_timer += 1
+            if self.bot_timer >= 30:
+                self.bot_timer = 0
+                # Bot decide se aceita ou foge
+                aceitar = self.bot_decidir_truco(self.jogador_atual)
+                self.responder_truco(aceitar)
+        # Bots jogam normalmente
+        elif self.jogador_atual != 0 and self.estado == 'jogando' and not self.esperando_resposta_truco:
             self.bot_timer += 1
             if self.bot_timer >= 30:  # ~0.5 segundos a 60 FPS
                 self.bot_timer = 0
-                self.escolher_bot(self.jogador_atual)
+                # Bot pode pedir truco antes de jogar
+                if self.pode_pedir_truco and self.bot_deve_pedir_truco(self.jogador_atual):
+                    if self.valor_rodada == 1:
+                        self.pedir_truco(self.jogador_atual)
+                    else:
+                        self.aumentar_truco(self.jogador_atual)
+                else:
+                    self.escolher_bot(self.jogador_atual)
 
     def draw(self):
         # Fundo da mesa
@@ -431,6 +598,41 @@ class JogoTrucoVisual:
         for carta_vis in self.cartas_visuais:
             carta_vis.draw(self.screen, face_up=True)
         
+        # Desenha botão de pedir truco (apenas para jogador humano)
+        if self.jogador_atual == 0 and self.pode_pedir_truco and not self.esperando_resposta_truco:
+            if self.valor_rodada == 1:
+                pygame.draw.rect(self.screen, AZUL, self.btn_pedir_truco, border_radius=8)
+                pygame.draw.rect(self.screen, BRANCO, self.btn_pedir_truco, 2, border_radius=8)
+                texto_truco = self.font.render("Pedir Truco", True, BRANCO)
+                self.screen.blit(texto_truco, (self.btn_pedir_truco.x + 10, self.btn_pedir_truco.y + 10))
+            elif self.valor_rodada >= 3 and self.valor_rodada < 12:
+                # Verifica se pode aumentar (equipe oposta)
+                if self.quem_pediu_truco is not None and (0 % 2 != self.quem_pediu_truco % 2):
+                    texto_aumentar = ""
+                    if self.valor_rodada == 3:
+                        texto_aumentar = "Pedir Seis"
+                    elif self.valor_rodada == 6:
+                        texto_aumentar = "Pedir Nove"
+                    elif self.valor_rodada == 9:
+                        texto_aumentar = "Pedir Doze"
+                    
+                    pygame.draw.rect(self.screen, AZUL, self.btn_aumentar_truco, border_radius=8)
+                    pygame.draw.rect(self.screen, BRANCO, self.btn_aumentar_truco, 2, border_radius=8)
+                    texto_btn = self.font.render(texto_aumentar, True, BRANCO)
+                    self.screen.blit(texto_btn, (self.btn_aumentar_truco.x + 10, self.btn_aumentar_truco.y + 10))
+        
+        # Desenha botões de aceitar/fugir quando esperando resposta
+        if self.esperando_resposta_truco and self.jogador_atual == 0:
+            pygame.draw.rect(self.screen, (0, 200, 0), self.btn_aceitar, border_radius=8)
+            pygame.draw.rect(self.screen, BRANCO, self.btn_aceitar, 2, border_radius=8)
+            texto_aceitar = self.font.render("Aceitar", True, BRANCO)
+            self.screen.blit(texto_aceitar, (self.btn_aceitar.x + 10, self.btn_aceitar.y + 10))
+            
+            pygame.draw.rect(self.screen, VERMELHO, self.btn_fugir, border_radius=8)
+            pygame.draw.rect(self.screen, BRANCO, self.btn_fugir, 2, border_radius=8)
+            texto_fugir = self.font.render("Fugir", True, BRANCO)
+            self.screen.blit(texto_fugir, (self.btn_fugir.x + 15, self.btn_fugir.y + 10))
+        
         # Desenha mensagem
         if self.mensagem_timer > 0:
             self.draw_mensagem()
@@ -447,12 +649,16 @@ class JogoTrucoVisual:
         self.screen.blit(texto_nos, (20, 20))
         self.screen.blit(texto_eles, (self.width - texto_eles.get_width() - 20, 20))
         
+        # Valor da rodada
+        texto_valor = self.font.render(f"Rodada vale: {self.valor_rodada} ponto(s)", True, AMARELO)
+        self.screen.blit(texto_valor, (self.width // 2 - texto_valor.get_width() // 2, 20))
+        
         # Vitórias na queda atual
         texto_vitorias = self.font.render(
             f"Rodadas: Nós {self.vitorias_queda[0]} x {self.vitorias_queda[1]} Eles", 
             True, AMARELO
         )
-        self.screen.blit(texto_vitorias, (self.width // 2 - texto_vitorias.get_width() // 2, 20))
+        self.screen.blit(texto_vitorias, (self.width // 2 - texto_vitorias.get_width() // 2, 50))
 
     def draw_info_mao(self):
         # Vira e manilha
