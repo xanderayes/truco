@@ -266,8 +266,8 @@ class JogoTrucoVisual:
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = pygame.mouse.get_pos()
             
-            # Se está esperando resposta de truco
-            if self.esperando_resposta_truco and self.jogador_atual == 0:
+            # Se está esperando resposta de truco e é a vez da equipe do jogador
+            if self.esperando_resposta_truco and (self.jogador_atual % 2 == 0):
                 if self.btn_aceitar.collidepoint(mouse_pos):
                     self.responder_truco(aceitar=True)
                 elif self.btn_fugir.collidepoint(mouse_pos):
@@ -334,7 +334,10 @@ class JogoTrucoVisual:
         self.esperando_resposta_truco = True
         self.jogador_atual = proximo_jogador
         
-        self.mensagem = f"Jogador {jogador_id} pediu TRUCO!"
+        if proximo_jogador % 2 == 0:
+            self.mensagem = f"Jogador {jogador_id} pediu TRUCO! Sua vez de decidir!"
+        else:
+            self.mensagem = f"Jogador {jogador_id} pediu TRUCO!"
         self.mensagem_timer = 180
 
     def responder_truco(self, aceitar):
@@ -396,12 +399,20 @@ class JogoTrucoVisual:
         self.esperando_resposta_truco = True
         self.jogador_atual = proximo_jogador
         
-        if self.valor_rodada == 3:
-            self.mensagem = f"Jogador {jogador_id} pediu SEIS!"
-        elif self.valor_rodada == 6:
-            self.mensagem = f"Jogador {jogador_id} pediu NOVE!"
-        elif self.valor_rodada == 9:
-            self.mensagem = f"Jogador {jogador_id} pediu DOZE!"
+        if proximo_jogador % 2 == 0:
+            if self.valor_rodada == 3:
+                self.mensagem = f"Jogador {jogador_id} pediu SEIS! Sua vez de decidir!"
+            elif self.valor_rodada == 6:
+                self.mensagem = f"Jogador {jogador_id} pediu NOVE! Sua vez de decidir!"
+            elif self.valor_rodada == 9:
+                self.mensagem = f"Jogador {jogador_id} pediu DOZE! Sua vez de decidir!"
+        else:
+            if self.valor_rodada == 3:
+                self.mensagem = f"Jogador {jogador_id} pediu SEIS!"
+            elif self.valor_rodada == 6:
+                self.mensagem = f"Jogador {jogador_id} pediu NOVE!"
+            elif self.valor_rodada == 9:
+                self.mensagem = f"Jogador {jogador_id} pediu DOZE!"
         self.mensagem_timer = 180
 
     def processar_rodada(self):
@@ -555,14 +566,18 @@ class JogoTrucoVisual:
         if self.mensagem_timer > 0:
             self.mensagem_timer -= 1
         
-        # Se está esperando resposta de truco de um bot
-        if self.esperando_resposta_truco and self.jogador_atual != 0 and self.estado == 'jogando':
-            self.bot_timer += 1
-            if self.bot_timer >= 30:
-                self.bot_timer = 0
-                # Bot decide se aceita ou foge
-                aceitar = self.bot_decidir_truco(self.jogador_atual)
-                self.responder_truco(aceitar)
+        # Se está esperando resposta de truco
+        if self.esperando_resposta_truco and self.estado == 'jogando':
+            # Se é a vez da equipe do jogador (jogador 0 ou parceiro 2), espera decisão humana
+            if self.jogador_atual % 2 == 0:
+                pass  # Espera clique do jogador humano
+            # Se é a vez da equipe oponente, bot decide
+            else:
+                self.bot_timer += 1
+                if self.bot_timer >= 30:
+                    self.bot_timer = 0
+                    aceitar = self.bot_decidir_truco(self.jogador_atual)
+                    self.responder_truco(aceitar)
         # Bots jogam normalmente
         elif self.jogador_atual != 0 and self.estado == 'jogando' and not self.esperando_resposta_truco:
             self.bot_timer += 1
@@ -621,8 +636,8 @@ class JogoTrucoVisual:
                     texto_btn = self.font.render(texto_aumentar, True, BRANCO)
                     self.screen.blit(texto_btn, (self.btn_aumentar_truco.x + 10, self.btn_aumentar_truco.y + 10))
         
-        # Desenha botões de aceitar/fugir quando esperando resposta
-        if self.esperando_resposta_truco and self.jogador_atual == 0:
+        # Desenha botões de aceitar/fugir quando esperando resposta da equipe do jogador
+        if self.esperando_resposta_truco and (self.jogador_atual % 2 == 0):
             pygame.draw.rect(self.screen, (0, 200, 0), self.btn_aceitar, border_radius=8)
             pygame.draw.rect(self.screen, BRANCO, self.btn_aceitar, 2, border_radius=8)
             texto_aceitar = self.font.render("Aceitar", True, BRANCO)
