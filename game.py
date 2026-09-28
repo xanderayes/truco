@@ -219,8 +219,8 @@ class JogoTrucoVisual:
         self.mesa = []
         self.vitorias_queda = {0: 0, 1: 0}
         self.rodada_atual = 1
-        self.primeiro_a_jogar = 0  # Jogador humano sempre começa
-        self.jogador_atual = 0
+        self.primeiro_a_jogar = (self.primeiro_a_jogar + 1) % 4  # Alterna quem começa
+        self.jogador_atual = self.primeiro_a_jogar
         self.primeira_cangada = False
         self.vencedor_primeira = None
         self.cartas_mesa = []
@@ -557,12 +557,20 @@ class JogoTrucoVisual:
             self.placar_nos += self.valor_rodada
             self.mensagem = f"NÓS ganhamos a mão! (+{self.valor_rodada})"
             self.mensagem_timer = 120
-            self.nova_mao()
+            # Verifica fim do jogo antes de nova mão
+            if self.placar_nos >= 12 or self.placar_eles >= 12:
+                self.estado = 'fim_jogo'
+            else:
+                self.nova_mao()
         elif self.vitorias_queda[1] == 2:
             self.placar_eles += self.valor_rodada
             self.mensagem = f"ELES ganharam a mão! (+{self.valor_rodada})"
             self.mensagem_timer = 120
-            self.nova_mao()
+            # Verifica fim do jogo antes de nova mão
+            if self.placar_nos >= 12 or self.placar_eles >= 12:
+                self.estado = 'fim_jogo'
+            else:
+                self.nova_mao()
         elif self.rodada_atual > 3:
             # Empate na terceira
             if self.vencedor_primeira is not None:
