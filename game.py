@@ -536,16 +536,20 @@ class JogoTrucoVisual:
         cartas = self.maos[jogador_id]
         forcas = [self.forca_carta(c, self.manilha_valor) for c in cartas]
         
-        # Se tem pelo menos uma manilha ou carta muito forte
-        tem_manilha = any(f >= 100 for f in forcas)
-        tem_carta_forte = any(f >= 7 for f in forcas)  # A, 2, 3
+        # Conta manilhas e cartas muito fortes
+        num_manilhas = sum(1 for f in forcas if f >= 100)
+        num_cartas_fortes = sum(1 for f in forcas if f >= 7)  # A, 2, 3
         
-        # Pede truco se tem boas cartas e ainda não pediu nesta queda
-        if (tem_manilha or tem_carta_forte) and self.pode_pedir_truco:
+        # Só pede truco se tiver mão muito boa
+        # Pelo menos 2 manilhas, ou 1 manilha + 1 carta forte
+        mao_forte = (num_manilhas >= 2) or (num_manilhas >= 1 and num_cartas_fortes >= 2)
+        
+        # Adiciona um pouco de aleatoriedade (70% de chance de pedir se tem mão forte)
+        if mao_forte and self.pode_pedir_truco:
             # Não pede se já pediu antes
             if self.quem_pediu_truco is not None and (jogador_id % 2 == self.quem_pediu_truco % 2):
                 return False
-            return True
+            return random.random() < 0.7
         return False
 
     def bot_decidir_truco(self, jogador_id):
@@ -553,14 +557,26 @@ class JogoTrucoVisual:
         cartas = self.maos[jogador_id]
         forcas = [self.forca_carta(c, self.manilha_valor) for c in cartas]
         
-        # Se o valor já está alto, só aceita com cartas muito boas
-        if self.valor_rodada >= 6:
-            tem_manilha = any(f >= 100 for f in forcas)
-            return tem_manilha
+        # Conta manilhas e cartas fortes
+        num_manilhas = sum(1 for f in forcas if f >= 100)
+        num_cartas_fortes = sum(1 for f in forcas if f >= 7)  # A, 2, 3
         
-        # Para truco normal (3 pontos), aceita se tem cartas razoáveis
-        tem_carta_boa = any(f >= 5 for f in forcas)  # K, A, 2, 3 ou manilha
-        return tem_carta_boa
+        # Se o valor já está alto (6+), só aceita com mão muito boa
+        if self.valor_rodada >= 6:
+            # Pelo menos 1 manilha para aceitar 6, 2 manilhas para 9+
+            if self.valor_rodada == 6:
+                return num_manilhas >= 1 and random.random() < 0.6
+            else:  # 9 ou 12
+                return num_manilhas >= 2 and random.random() < 0.5
+        
+        # Para truco normal (3 pontos), aceita se tem pelo menos uma carta boa
+        # Carta boa = A, 2, 3 ou manilha
+        tem_carta_boa = any(f >= 7 for f in forcas)
+        if tem_carta_boa:
+            return random.random() < 0.7
+        
+        # Se não tem carta boa, só aceita raramente (blefe)
+        return random.random() < 0.2
 
     def update(self):
         if self.mensagem_timer > 0:
