@@ -183,6 +183,11 @@ class JogoTrucoVisual:
         self.esperando_resposta_truco = False  # se está esperando aceitar/fugir
         self.pode_pedir_truco = True  # se ainda pode pedir truco nesta queda
         
+        # Estado da mão de onze
+        self.mao_de_onze = False  # se está em mão de onze
+        self.esperando_decisao_onze = False  # se está esperando decisão de entrar/fugir
+        self.mao_escuro = False  # se está jogando no escuro (11x11)
+        
         # Cartas visuais
         self.cartas_visuais = []
         self.cartas_mesa = []
@@ -199,6 +204,10 @@ class JogoTrucoVisual:
         self.btn_aumentar_truco = pygame.Rect(self.width - 200, self.height - 160, 180, 50)
         self.btn_aceitar = pygame.Rect(self.width // 2 - 100, self.height // 2 + 50, 90, 50)
         self.btn_fugir = pygame.Rect(self.width // 2 + 10, self.height // 2 + 50, 90, 50)
+        
+        # Botões da mão de onze
+        self.btn_entrar_onze = pygame.Rect(self.width // 2 - 100, self.height // 2 + 50, 90, 50)
+        self.btn_fugir_onze = pygame.Rect(self.width // 2 + 10, self.height // 2 + 50, 90, 50)
         
         # Inicia nova mão
         self.nova_mao()
@@ -222,11 +231,38 @@ class JogoTrucoVisual:
         self.esperando_resposta_truco = False
         self.pode_pedir_truco = True
         
+        # Verifica mão de onze
+        equipe_onze_nos = self.placar_nos == 11
+        equipe_onze_eles = self.placar_eles == 11
+        mao_onze_dupla = equipe_onze_nos or equipe_onze_eles
+        
+        self.mao_de_onze = mao_onze_dupla
+        self.mao_escuro = equipe_onze_nos and equipe_onze_eles
+        
+        if self.mao_de_onze:
+            self.esperando_decisao_onze = True
+            self.pode_pedir_truco = False  # Não pode pedir truco na mão de onze
+            
+            if self.mao_escuro:
+                self.mensagem = "Mão de onze dupla! Jogando no escuro!"
+                self.mensagem_timer = 120
+                self.esperando_decisao_onze = False
+                self.valor_rodada = 3  # Vale 3 pontos automaticamente
+            elif equipe_onze_nos:
+                self.mensagem = "Mão de onze! Sua equipe decide: entrar ou fugir?"
+                self.mensagem_timer = 180
+            else:
+                self.mensagem = "Mão de onze! Oponentes decidem..."
+                self.mensagem_timer = 180
+        else:
+            self.esperando_decisao_onze = False
+        
         # Cria cartas visuais para o jogador
         self.criar_cartas_jogador()
         
-        self.mensagem = f"Nova mão! Vira: {self.vira}"
-        self.mensagem_timer = 120
+        if not self.mao_de_onze:
+            self.mensagem = f"Nova mão! Vira: {self.vira}"
+            self.mensagem_timer = 120
 
     def obter_manilha_e_vira(self, baralho):
         vira = baralho.cartas.pop()
@@ -258,6 +294,18 @@ class JogoTrucoVisual:
                 self.nova_mao()
             return
 
+        # Teclas numéricas para jogar cartas no escuro
+        if self.mao_escuro and event.type == pygame.KEYDOWN and self.jogador_atual == 0:
+            if event.key == pygame.K_1 and len(self.cartas_visuais) >= 1:
+                self.jogar_carta_humano(0)
+                return
+            elif event.key == pygame.K_2 and len(self.cartas_visuais) >= 2:
+                self.jogar_carta_humano(1)
+                return
+            elif event.key == pygame.K_3 and len(self.cartas_visuais) >= 3:
+                self.jogar_carta_humano(2)
+                return
+
         if event.type == pygame.MOUSEMOTION:
             mouse_pos = pygame.mouse.get_pos()
             for carta_vis in self.cartas_visuais:
@@ -265,6 +313,14 @@ class JogoTrucoVisual:
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = pygame.mouse.get_pos()
+            
+            # Se está esperando decisão de mão de onze da equipe do jogador
+            if self.esperando_decisao_onze and self.placar_nos == 11:
+                if self.btn_entrar_onze.collidepoint(mouse_pos):
+                    self.decidir_mao_onze(entrar=True)
+                elif self.btn_fugir_onze.collidepoint(mouse_pos):
+                    self.decidir_mao_onze(entrar=False)
+                return
             
             # Se está esperando resposta de truco e é a vez da equipe do jogador
             if self.esperando_resposta_truco and (self.jogador_atual % 2 == 0):
@@ -274,8 +330,8 @@ class JogoTrucoVisual:
                     self.responder_truco(aceitar=False)
                 return
             
-            # Se é a vez do jogador humano e não está esperando truco
-            if self.jogador_atual == 0 and not self.esperando_resposta_truco:
+            # Se é a vez do jogador humano e não está esperando truco nem decisão de onze
+            if self.jogador_atual == 0 and not self.esperando_resposta_truco and not self.esperando_decisao_onze:
                 # Verifica clique no botão de pedir truco
                 if self.pode_pedir_truco and self.valor_rodada == 1 and self.btn_pedir_truco.collidepoint(mouse_pos):
                     self.pedir_truco(0)
@@ -327,6 +383,10 @@ class JogoTrucoVisual:
     def pedir_truco(self, jogador_id):
         """Jogador pede truco."""
         if not self.pode_pedir_truco:
+            return
+        
+        # Não pode pedir truco na mão de onze
+        if self.mao_de_onze:
             return
         
         proximo_jogador = (jogador_id + 1) % 4
@@ -390,6 +450,10 @@ class JogoTrucoVisual:
         if self.valor_rodada >= 12:
             return
         
+        # Não pode pedir truco na mão de onze
+        if self.mao_de_onze:
+            return
+        
         # Apenas a equipe oposta a quem pediu pode aumentar
         if self.quem_pediu_truco is not None and (jogador_id % 2 == self.quem_pediu_truco % 2):
             return
@@ -414,6 +478,34 @@ class JogoTrucoVisual:
             elif self.valor_rodada == 9:
                 self.mensagem = f"Jogador {jogador_id} pediu DOZE!"
         self.mensagem_timer = 180
+
+    def decidir_mao_onze(self, entrar):
+        """Decide se entra ou foge da mão de onze."""
+        if not self.esperando_decisao_onze:
+            return
+        
+        self.esperando_decisao_onze = False
+        
+        if not entrar:
+            # Fugiu - equipe oponente ganha 1 ponto
+            if self.placar_nos == 11:
+                self.placar_eles += 1
+                self.mensagem = "Fugimos! ELES ganham 1 ponto!"
+            else:
+                self.placar_nos += 1
+                self.mensagem = "Eles fugiram! NÓS ganhamos 1 ponto!"
+            self.mensagem_timer = 120
+            
+            # Verifica fim do jogo
+            if self.placar_nos >= 12 or self.placar_eles >= 12:
+                self.estado = 'fim_jogo'
+            else:
+                self.nova_mao()
+        else:
+            # Entrou - rodada vale 3 pontos
+            self.valor_rodada = 3
+            self.mensagem = "Entramos! Rodada vale 3 pontos!"
+            self.mensagem_timer = 120
 
     def processar_rodada(self):
         # Determina vencedor da vaza
@@ -578,12 +670,48 @@ class JogoTrucoVisual:
         # Se não tem carta boa, só aceita raramente (blefe)
         return random.random() < 0.2
 
+    def bot_decidir_mao_onze(self, equipe_id):
+        """Decide se a equipe do bot entra ou foge da mão de onze."""
+        # Analisa a mão da equipe (dois jogadores da mesma equipe)
+        jogador1 = equipe_id
+        jogador2 = equipe_id + 2 if equipe_id < 2 else equipe_id - 2
+        
+        cartas_equipe = self.maos[jogador1] + self.maos[jogador2]
+        forcas = [self.forca_carta(c, self.manilha_valor) for c in cartas_equipe]
+        
+        # Conta manilhas e cartas fortes da equipe
+        num_manilhas = sum(1 for f in forcas if f >= 100)
+        num_cartas_fortes = sum(1 for f in forcas if f >= 7)  # A, 2, 3
+        
+        # Entra se tiver mão muito boa (2+ manilhas ou 1 manilha + 3 cartas fortes)
+        mao_muito_boa = (num_manilhas >= 2) or (num_manilhas >= 1 and num_cartas_fortes >= 3)
+        
+        if mao_muito_boa:
+            return random.random() < 0.8
+        elif num_manilhas >= 1:
+            return random.random() < 0.5
+        else:
+            return random.random() < 0.3
+
     def update(self):
         if self.mensagem_timer > 0:
             self.mensagem_timer -= 1
         
+        # Se está esperando decisão de mão de onze
+        if self.esperando_decisao_onze and self.estado == 'jogando':
+            # Se é a equipe do jogador, espera decisão humana
+            if self.placar_nos == 11:
+                pass  # Espera clique do jogador humano
+            # Se é a equipe oponente, bot decide
+            else:
+                self.bot_timer += 1
+                if self.bot_timer >= 30:
+                    self.bot_timer = 0
+                    entrar = self.bot_decidir_mao_onze(1)
+                    self.decidir_mao_onze(entrar)
+        
         # Se está esperando resposta de truco
-        if self.esperando_resposta_truco and self.estado == 'jogando':
+        elif self.esperando_resposta_truco and self.estado == 'jogando':
             # Se é a vez da equipe do jogador (jogador 0 ou parceiro 2), espera decisão humana
             if self.jogador_atual % 2 == 0:
                 pass  # Espera clique do jogador humano
@@ -595,7 +723,7 @@ class JogoTrucoVisual:
                     aceitar = self.bot_decidir_truco(self.jogador_atual)
                     self.responder_truco(aceitar)
         # Bots jogam normalmente
-        elif self.jogador_atual != 0 and self.estado == 'jogando' and not self.esperando_resposta_truco:
+        elif self.jogador_atual != 0 and self.estado == 'jogando' and not self.esperando_resposta_truco and not self.esperando_decisao_onze:
             self.bot_timer += 1
             if self.bot_timer >= 30:  # ~0.5 segundos a 60 FPS
                 self.bot_timer = 0
@@ -626,8 +754,12 @@ class JogoTrucoVisual:
         self.draw_mao_bot(3, 80, self.height // 2)
         
         # Desenha mão do jogador
-        for carta_vis in self.cartas_visuais:
-            carta_vis.draw(self.screen, face_up=True)
+        for i, carta_vis in enumerate(self.cartas_visuais):
+            carta_vis.draw(self.screen, face_up=not self.mao_escuro)
+            # Se está no escuro, mostra número da carta
+            if self.mao_escuro:
+                texto_num = self.font.render(str(i + 1), True, BRANCO)
+                self.screen.blit(texto_num, (carta_vis.x + carta_vis.width // 2 - 10, carta_vis.y + carta_vis.height // 2 - 10))
         
         # Desenha botão de pedir truco (apenas para jogador humano)
         if self.jogador_atual == 0 and self.pode_pedir_truco and not self.esperando_resposta_truco:
@@ -664,6 +796,18 @@ class JogoTrucoVisual:
             texto_fugir = self.font.render("Fugir", True, BRANCO)
             self.screen.blit(texto_fugir, (self.btn_fugir.x + 15, self.btn_fugir.y + 10))
         
+        # Desenha botões de entrar/fugir na mão de onze
+        if self.esperando_decisao_onze and self.placar_nos == 11:
+            pygame.draw.rect(self.screen, (0, 200, 0), self.btn_entrar_onze, border_radius=8)
+            pygame.draw.rect(self.screen, BRANCO, self.btn_entrar_onze, 2, border_radius=8)
+            texto_entrar = self.font.render("Entrar", True, BRANCO)
+            self.screen.blit(texto_entrar, (self.btn_entrar_onze.x + 15, self.btn_entrar_onze.y + 10))
+            
+            pygame.draw.rect(self.screen, VERMELHO, self.btn_fugir_onze, border_radius=8)
+            pygame.draw.rect(self.screen, BRANCO, self.btn_fugir_onze, 2, border_radius=8)
+            texto_fugir = self.font.render("Fugir", True, BRANCO)
+            self.screen.blit(texto_fugir, (self.btn_fugir_onze.x + 15, self.btn_fugir_onze.y + 10))
+        
         # Desenha mensagem
         if self.mensagem_timer > 0:
             self.draw_mensagem()
@@ -684,12 +828,27 @@ class JogoTrucoVisual:
         texto_valor = self.font.render(f"Rodada vale: {self.valor_rodada} ponto(s)", True, AMARELO)
         self.screen.blit(texto_valor, (self.width // 2 - texto_valor.get_width() // 2, 20))
         
+        # Indicador de mão de onze
+        if self.mao_de_onze:
+            texto_onze = self.font.render("MÃO DE ONZE", True, VERMELHO)
+            self.screen.blit(texto_onze, (self.width // 2 - texto_onze.get_width() // 2, 50))
+            if self.mao_escuro:
+                texto_escuro = self.font.render("NO ESCURO!", True, VERMELHO)
+                self.screen.blit(texto_escuro, (self.width // 2 - texto_escuro.get_width() // 2, 80))
+                texto_instrucao = self.font.render("Pressione 1, 2, 3 para jogar", True, BRANCO)
+                self.screen.blit(texto_instrucao, (self.width // 2 - texto_instrucao.get_width() // 2, 105))
+        
         # Vitórias na queda atual
         texto_vitorias = self.font.render(
             f"Rodadas: Nós {self.vitorias_queda[0]} x {self.vitorias_queda[1]} Eles", 
             True, AMARELO
         )
-        self.screen.blit(texto_vitorias, (self.width // 2 - texto_vitorias.get_width() // 2, 50))
+        if self.mao_escuro:
+            self.screen.blit(texto_vitorias, (self.width // 2 - texto_vitorias.get_width() // 2, 130))
+        elif self.mao_de_onze:
+            self.screen.blit(texto_vitorias, (self.width // 2 - texto_vitorias.get_width() // 2, 80))
+        else:
+            self.screen.blit(texto_vitorias, (self.width // 2 - texto_vitorias.get_width() // 2, 50))
 
     def draw_info_mao(self):
         # Vira e manilha
@@ -717,7 +876,8 @@ class JogoTrucoVisual:
             rect = pygame.Rect(x - quantidade * 15 + i * 30, y, 60, 90)
             
             # Se for o parceiro (jogador 2) e tiver carta alta, mostra a carta
-            if jogador_id == 2 and i < len(self.maos[2]) and self.carta_e_alta(self.maos[2][i]):
+            # Mas não mostra se estiver jogando no escuro
+            if jogador_id == 2 and i < len(self.maos[2]) and self.carta_e_alta(self.maos[2][i]) and not self.mao_escuro:
                 carta_vis = CartaVisual(self.maos[2][i], rect.x, rect.y, 60, 90)
                 carta_vis.draw(self.screen, face_up=True)
             else:
